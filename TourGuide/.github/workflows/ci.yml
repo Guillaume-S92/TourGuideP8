@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "master", "stape-5" ]
+  pull_request:
+    branches: [ "main", "master", "stape-5" ]
+
+jobs:
+  build-test-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      # 1) Compile
+      - name: Compile
+        working-directory: TourGuide
+        run: mvn -B -DskipTests compile
+
+      # 2) Tests (en excluant TestPerformance)
+      - name: Test
+        working-directory: TourGuide
+        run: mvn -B test -Dtest='!*TestPerformance*'
+
+      # 3) Package (jar) sans relancer les tests
+      - name: Package
+        working-directory: TourGuide
+        run: mvn -B package -DskipTests
+
+      - name: Upload artifact (jar)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tourguide-jar
+          path: TourGuide/target/*.jar
