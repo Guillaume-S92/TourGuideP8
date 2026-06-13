@@ -94,6 +94,15 @@ La récupération des positions utilisateurs a été optimisée avec un traiteme
 
 L'objectif est de traiter un grand volume d'utilisateurs beaucoup plus rapidement qu'avec une exécution strictement séquentielle.
 
+#### Variante avec les Virtual Threads
+
+Une implémentation alternative est disponible sur la branche [`virtual-threads`](https://github.com/Guillaume-S92/TourGuideP8/tree/virtual-threads). Elle utilise les **Virtual Threads de Java 21** à la place de `CompletableFuture` et du pool fixe de threads.
+
+Les deux branches permettent ainsi d'implémenter et de comparer les deux technologies avec les mêmes traitements et les mêmes tests de performance :
+
+- `master` : `CompletableFuture` avec un `ExecutorService` dédié ;
+- `virtual-threads` : un virtual thread par tâche avec `Executors.newVirtualThreadPerTaskExecutor()`.
+
 ---
 
 ### Optimisation du calcul des récompenses
