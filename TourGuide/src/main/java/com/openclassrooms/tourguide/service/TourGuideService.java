@@ -15,10 +15,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -43,8 +46,7 @@ public class TourGuideService {
     private final RewardsService rewardsService;
     private final TripPricer tripPricer = new TripPricer();
 
-    // Dedicated pool for async tasks (CompletableFuture)
-    private final ExecutorService executor = Executors.newFixedThreadPool(100);
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
     public final Tracker tracker;
     boolean testMode = true;
@@ -107,34 +109,33 @@ public class TourGuideService {
         return visitedLocation;
     }
 
-    // CompletableFuture version (producer)
-    public CompletableFuture<VisitedLocation> trackUserLocationAsync(User user) {
-        return CompletableFuture.supplyAsync(() -> trackUserLocation(user), executor);
+    public void trackAllUsersLocationsAndWait() {
+        executeForAllUsers(this::trackUserLocation);
     }
 
-
-    public void trackAllUsersLocationsAsyncAndWait() {
-        List<User> users = getAllUsers();
-        CompletableFuture<?>[] futures = users.stream()
-                .map(this::trackUserLocationAsync)
-                .toArray(CompletableFuture[]::new);
-
-        CompletableFuture.allOf(futures).join();
+    public void calculateRewardsForAllUsersAndWait() {
+        executeForAllUsers(rewardsService::calculateRewards);
     }
 
-    public CompletableFuture<Void> calculateRewardsAsync(User user) {
-        return CompletableFuture.runAsync(() -> rewardsService.calculateRewards(user), executor);
-    }
+    private void executeForAllUsers(Consumer<User> action) {
+        List<Callable<Void>> tasks = getAllUsers().stream()
+                .map(user -> (Callable<Void>) () -> {
+                    action.accept(user);
+                    return null;
+                })
+                .toList();
 
-
-    public void calculateRewardsForAllUsersAsyncAndWait() {
-        List<User> users = getAllUsers();
-
-        CompletableFuture<?>[] futures = users.stream()
-                .map(this::calculateRewardsAsync)
-                .toArray(CompletableFuture[]::new);
-
-        CompletableFuture.allOf(futures).join();
+        try {
+            List<Future<Void>> futures = executor.invokeAll(tasks);
+            for (Future<Void> future : futures) {
+                future.get();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Bulk user processing was interrupted", e);
+        } catch (ExecutionException e) {
+            throw new IllegalStateException("Bulk user processing failed", e.getCause());
+        }
     }
 
     public List<Attraction> getNearByAttractions(VisitedLocation visitedLocation) {
