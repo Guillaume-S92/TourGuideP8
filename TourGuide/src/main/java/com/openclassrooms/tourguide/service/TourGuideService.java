@@ -85,7 +85,7 @@ public class TourGuideService {
     }
 
     public void addUser(User user) {
-        // simple atomic insert
+
         internalUserMap.putIfAbsent(user.getUserName(), user);
     }
 
@@ -112,7 +112,7 @@ public class TourGuideService {
         return CompletableFuture.supplyAsync(() -> trackUserLocation(user), executor);
     }
 
-    // Run tracking for ALL users concurrently (consumer waits with allOf)
+
     public void trackAllUsersLocationsAsyncAndWait() {
         List<User> users = getAllUsers();
         CompletableFuture<?>[] futures = users.stream()
@@ -121,12 +121,12 @@ public class TourGuideService {
 
         CompletableFuture.allOf(futures).join();
     }
-    // CompletableFuture version for rewards calculation
+
     public CompletableFuture<Void> calculateRewardsAsync(User user) {
         return CompletableFuture.runAsync(() -> rewardsService.calculateRewards(user), executor);
     }
 
-    // Run rewards calculation for ALL users concurrently and wait
+
     public void calculateRewardsForAllUsersAsyncAndWait() {
         List<User> users = getAllUsers();
 
@@ -136,7 +136,7 @@ public class TourGuideService {
 
         CompletableFuture.allOf(futures).join();
     }
-    // Used by step 3 test: always return 5 closest (no range filter)
+
     public List<Attraction> getNearByAttractions(VisitedLocation visitedLocation) {
         return gpsUtil.getAttractions().stream()
                 .sorted(Comparator.comparingDouble(a -> rewardsService.getDistance(a, visitedLocation.location)))
